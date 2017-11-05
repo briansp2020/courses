@@ -7,18 +7,23 @@ from scipy import misc, ndimage
 from scipy.ndimage.interpolation import zoom
 
 from keras import backend as K
+
 from keras.layers.normalization import BatchNormalization
 from keras.utils.data_utils import get_file
 from keras.models import Sequential
 from keras.layers.core import Flatten, Dense, Dropout, Lambda
-from keras.layers.convolutional import Convolution2D, MaxPooling2D, ZeroPadding2D
+from keras.layers.convolutional import Conv2D, MaxPooling2D, ZeroPadding2D
 from keras.layers.pooling import GlobalAveragePooling2D
 from keras.optimizers import SGD, RMSprop, Adam
 from keras.preprocessing import image
+from keras.utils import convert_all_kernels_in_model
 
+def ceildiv(a, b):
+    return -(-a // b)
+	
 # In case we are going to use the TensorFlow backend we need to explicitly set the Theano image ordering
-from keras import backend as K
-K.set_image_dim_ordering('th')
+#from keras import backend as K
+#K.set_image_dim_ordering('th')
 
 
 vgg_mean = np.array([123.68, 116.779, 103.939], dtype=np.float32).reshape((3,1,1))
@@ -97,7 +102,7 @@ class Vgg16():
         model = self.model
         for i in range(layers):
             model.add(ZeroPadding2D((1, 1)))
-            model.add(Convolution2D(filters, 3, 3, activation='relu'))
+            model.add(Conv2D(filters, (3, 3), activation='relu'))
         model.add(MaxPooling2D((2, 2), strides=(2, 2)))
 
 
@@ -137,6 +142,8 @@ class Vgg16():
 
         fname = 'vgg16.h5'
         model.load_weights(get_file(fname, self.FILE_PATH+fname, cache_subdir='models'))
+        # convert to tf
+        convert_all_kernels_in_model(model)
 
 
     def get_batches(self, path, gen=image.ImageDataGenerator(), shuffle=True, batch_size=8, class_mode='categorical'):
@@ -174,7 +181,7 @@ class Vgg16():
                 batches : A keras.preprocessing.image.ImageDataGenerator object.
                           See definition for get_batches().
         """
-        self.ft(batches.nb_class)
+        self.ft(batches.num_classes)
         classes = list(iter(batches.class_indices)) # get a list of all the class labels
         
         # batches.class_indices is a dict with the class name as key and an index as value
@@ -209,8 +216,8 @@ class Vgg16():
             Fits the model on data yielded batch-by-batch by a Python generator.
             See Keras documentation: https://keras.io/models/model/
         """
-        self.model.fit_generator(batches, samples_per_epoch=batches.nb_sample, nb_epoch=nb_epoch,
-                validation_data=val_batches, nb_val_samples=val_batches.nb_sample)
+        self.model.fit_generator(batches, steps_per_epoch=ceildiv(batches.samples, batches.batch_size), epochs=nb_epoch,
+                validation_data=val_batches, validation_steps=ceildiv(val_batches.samples, val_batches.batch_size))
 
 
     def test(self, path, batch_size=8):
@@ -227,5 +234,5 @@ class Vgg16():
     
         """
         test_batches = self.get_batches(path, shuffle=False, batch_size=batch_size, class_mode=None)
-        return test_batches, self.model.predict_generator(test_batches, test_batches.nb_sample)
+        return test_batches, self.model.predict_generator(test_batches, ceildiv(test_batches.samples, test_batches.batch_size))
 
