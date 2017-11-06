@@ -22,8 +22,7 @@ def ceildiv(a, b):
     return -(-a // b)
 	
 # In case we are going to use the TensorFlow backend we need to explicitly set the Theano image ordering
-#from keras import backend as K
-#K.set_image_dim_ordering('th')
+K.set_image_dim_ordering('th')
 
 
 vgg_mean = np.array([123.68, 116.779, 103.939], dtype=np.float32).reshape((3,1,1))
